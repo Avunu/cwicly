@@ -27,7 +27,7 @@
             packages = [
               pkgs.php83
               pkgs.php83.packages.composer
-              pkgs.nodejs_20
+              pkgs.nodejs_24
             ];
           };
         }

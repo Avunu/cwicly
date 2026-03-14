@@ -1,6 +1,9 @@
-vendor
-test-results
+.direnv
+.DS_Store
+.phpunit.cache
+build/index.js
 node_modules
 readable
-build/index.js
-.DS_Store
+result/
+test-results
+vendor
