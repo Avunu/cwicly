@@ -116,7 +116,23 @@ if (
  */
 function cwicly_set_script_translations() {
 	load_plugin_textdomain( 'cwicly', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
-	wp_register_script( 'cwicly_editor_blocks', CWICLY_DIR_URL . 'build/index.js', array( 'lodash', 'wp-i18n', 'wp-blocks', 'wp-i18n', 'wp-element', 'wp-edit-post', 'wp-editor', 'wp-api', 'wp-data', 'wp-block-editor', 'wp-core-data' ), CWICLY_VERSION, true );
+	
+	$asset_file = CWICLY_DIR_PATH . 'build/index.asset.php';
+	$asset      = file_exists( $asset_file )
+		? require $asset_file
+		: array(
+			'dependencies' => array( 'wp-blocks', 'wp-element', 'wp-data', 'wp-i18n', 'wp-components', 'wp-block-editor', 'wp-compose', 'wp-hooks', 'wp-api-fetch' ),
+			'version'      => CWICLY_VERSION,
+		);
+
+	wp_register_script(
+		'cwicly_editor_blocks',
+		CWICLY_DIR_URL . 'build/index.js',
+		$asset['dependencies'],
+		$asset['version'],
+		true
+	);
+	
 	wp_set_script_translations( 'cwicly_editor_blocks', 'cwicly', plugin_dir_path( __FILE__ ) . 'languages' );
 }
 add_action( 'init', 'cwicly_set_script_translations' );
