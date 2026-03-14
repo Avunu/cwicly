@@ -12,12 +12,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Register block render callback.
  */
-register_block_type(
-	__DIR__,
-	array(
-		'render_callback' => 'cc_fragment_render_callback',
-	)
-);
+function cwicly_fragment_register() {
+	register_block_type(
+		__DIR__,
+		array(
+			'render_callback' => 'cc_fragment_render_callback',
+		)
+	);
+}
+add_action( 'init', 'cwicly_fragment_register' );
 
 /**
  * Render callback.

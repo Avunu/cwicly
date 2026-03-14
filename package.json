@@ -9,6 +9,9 @@
   "scripts": {
     "build": "wp-scripts build",
     "start": "wp-scripts start",
+    "playground": "npx @wp-playground/cli@latest start --blueprint=blueprint.json",
+    "playground:server": "npx @wp-playground/cli@latest server --mount=.:/wordpress/wp-content/plugins/cwicly --blueprint=blueprint.json --login",
+    "playground:reset": "npx @wp-playground/cli@latest start --blueprint=blueprint.json --reset",
     "test": "echo \"Error: no test specified\" && exit 1",
     "upgrade": "npx npm-check-updates -u && npm install --force"
   },

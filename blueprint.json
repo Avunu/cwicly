@@ -1,0 +1,10 @@
+{
+    "landingPage": "/wp-admin/",
+    "login": true,
+    "steps": [
+        {
+            "step": "activatePlugin",
+            "pluginPath": "cwicly/cwicly.php"
+        }
+    ]
+}
