@@ -3,7 +3,7 @@ import { useBlockProps, RichText, InspectorControls, BlockControls } from '@word
 import { ToolbarGroup } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { useSelect } from '@wordpress/data';
-import { getBlockID, BackgroundHelper } from '../../utils';
+import { getBlockID, BackgroundHelper } from '../../utils/index.js';
 
 export default function Edit({ attributes, setAttributes, clientId }) {
     const blockProps = useBlockProps({

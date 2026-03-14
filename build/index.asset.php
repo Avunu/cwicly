@@ -1,16 +1,1 @@
-<?php
-// build/index.asset.php
-return array(
-    'dependencies' => array(
-        'wp-blocks',
-        'wp-element',
-        'wp-data',
-        'wp-i18n',
-        'wp-components',
-        'wp-block-editor',
-        'wp-compose',
-        'wp-hooks',
-        'wp-api-fetch',
-    ),
-    'version' => '1.5.0',
-);
+<?php return array('dependencies' => array('react-jsx-runtime', 'wp-block-editor', 'wp-blocks', 'wp-components', 'wp-data', 'wp-element', 'wp-i18n'), 'version' => 'edc0a23c876d3571d3d3');

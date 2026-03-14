@@ -6,6 +6,38 @@ import save from './save.js';
 registerBlockType('cwicly/paragraph', {
   title: __('Paragraph', 'cwicly'),
   icon: 'editor-paragraph',
+  category: 'cwicly',
+  attributes: {
+    content: {
+      type: 'string',
+      source: 'html',
+      selector: 'p',
+      default: '',
+    },
+    uniqueID: {
+      type: 'string',
+    },
+    classID: {
+      type: 'string',
+    },
+    classes: {
+      type: 'string',
+      default: '',
+    },
+    // Link attributes
+    linkWrapperActive: { type: 'boolean', default: false },
+    linkWrapperUrl: { type: 'string', default: '' },
+    linkWrapperNewTab: { type: 'boolean', default: false },
+    linkWrapperRel: { type: 'string', default: '' },
+    linkWrapperTitle: { type: 'string', default: '' },
+    // Cwicly standard attributes
+    isStyling: { type: 'boolean', default: true },
+    skeletonActive: { type: 'boolean', default: true },
+    htmlAttributes: { type: 'array', default: [] },
+    relativeStyles: { type: 'array', default: [] },
+    customCSS: { type: 'string', default: '' },
+    interactions: { type: 'object', default: { click: [], dbclick: [], scrollinview: [] } },
+  },
   supports: {
     anchor: true,
     html: false,
