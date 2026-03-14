@@ -1,2 +1,7 @@
 vendor
 test-results
+node_modules
+readable
+build/index.js
+build/index.asset.php
+.DS_Store

@@ -1,0 +1,29 @@
+{
+  "name": "cwicly",
+  "version": "1.0.0",
+  "description": "Maintenance version of the Cwicly WordPress plugin for existing websites",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "wp-scripts build",
+    "start": "wp-scripts start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/StrangeTechDev/cwicly.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/StrangeTechDev/cwicly/issues"
+  },
+  "homepage": "https://github.com/StrangeTechDev/cwicly#readme",
+  "devDependencies": {
+    "@wordpress/scripts": "^31.6.0"
+  }
+}
