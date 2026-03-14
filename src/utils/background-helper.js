@@ -3,7 +3,7 @@ import { Fragment, createElement } from '@wordpress/element';
 /**
  * Semantic replacement for the Background helper component.
  */
-export function BackgroundEditorHelper({ attributes }) {
+export function BackgroundHelper({ attributes }) {
   const {
     backgroundYoutubeURL,
     backgroundClipPathContent,
