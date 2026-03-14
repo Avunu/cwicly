@@ -45,12 +45,11 @@
 
           # -------------------------------------------------------------- #
           # PHP / Composer vendor dependencies                               #
-          # composition-c4 reads composer.lock per-package via              #
-          # builtins.fetchGit — no vendorHash needed.                       #
+          # c4.fetchComposerDeps reads composer.lock per-package via        #
+          # builtins.fetchGit — no hash needed.                             #
           # -------------------------------------------------------------- #
-          composerRepository = pkgs.c4.buildComposerRepository {
-            inherit pname version src;
-            composerNoDev = true;
+          composerDeps = pkgs.c4.fetchComposerDeps {
+            inherit src;
           };
 
           # -------------------------------------------------------------- #
@@ -61,8 +60,8 @@
           builtAssets = buildNpmPackage {
             inherit pname version src;
 
-            npmDeps       = importNpmLock { npmRoot = src; };
-            npmConfigHook = importNpmLock.npmConfigHook;
+            npmDeps        = importNpmLock { npmRoot = src; };
+            npmConfigHook  = importNpmLock.npmConfigHook;
             npmBuildScript = "build";
 
             installPhase = ''
@@ -79,15 +78,19 @@
           # Final plugin assembly                                            #
           # ---------------------------------------------------------------- #
           default = stdenvNoCC.mkDerivation {
-            inherit pname version src;
+            inherit pname version src composerDeps;
 
             nativeBuildInputs = [
               php
               php.packages.composer
-              php.composerHooks.composerInstallHook
+              pkgs.c4.composerSetupHook
             ];
 
-            inherit composerRepository;
+            buildPhase = ''
+              runHook preBuild
+              composer --no-ansi install --no-dev --no-interaction --optimize-autoloader
+              runHook postBuild
+            '';
 
             installPhase = ''
               runHook preInstall
@@ -96,12 +99,10 @@
               mkdir -p "$pluginDir"
 
               cp cwicly.php readme.txt wpml-config.xml "$pluginDir/"
-              cp -r assets core "$pluginDir/"
-
-              # Composer vendor/ is installed by composerInstallHook.
-              cp -r vendor "$pluginDir/"
+              cp -r assets core vendor "$pluginDir/"
 
               # Compiled JS/CSS from wp-scripts build.
+              mkdir -p "$pluginDir/build"
               cp -r ${builtAssets}/. "$pluginDir/build/"
 
               runHook postInstall
