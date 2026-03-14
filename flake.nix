@@ -41,7 +41,7 @@
 
           pname   = "cwicly";
           version = "1.0.0";
-          src     = ./.;
+          src     = self;
 
           # -------------------------------------------------------------- #
           # PHP / Composer vendor dependencies                               #
