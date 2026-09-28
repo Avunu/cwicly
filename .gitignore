@@ -1,2 +1,10 @@
 vendor
 test-results
+node_modules
+result
+result-*
+.direnv
+.phpunit.cache
+tests/tools/vendor
+*.zip
+.pre-commit-config.yaml

@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<!--
+    Pure unit suite. No database, no WordPress: Brain Monkey defines the
+    WordPress functions, and tests/bootstrap/unit.php requires the handful of
+    plugin class files under test directly (cwicly has no autoloader; its real
+    bootstrap needs a full ABSPATH).
+
+    The runtime behavior of the assembled plugin is covered by the wp-playground
+    harness in tests/playground instead.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="tools/vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="bootstrap/unit.php"
+         colors="true"
+         beStrictAboutTestsThatDoNotTestAnything="true"
+         beStrictAboutOutputDuringTests="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         failOnDeprecation="true"
+         failOnNotice="true"
+         cacheDirectory=".phpunit.cache"
+         displayDetailsOnTestsThatTriggerDeprecations="true"
+         displayDetailsOnTestsThatTriggerNotices="true"
+         displayDetailsOnTestsThatTriggerWarnings="true">
+    <testsuites>
+        <testsuite name="unit">
+            <directory suffix="Test.php">Unit</directory>
+        </testsuite>
+    </testsuites>
+
+    <source>
+        <include>
+            <directory suffix=".php">../core/includes/classes</directory>
+        </include>
+    </source>
+</phpunit>

@@ -1,0 +1,23 @@
+{
+    "name": "avunu/cwicly-test-tools",
+    "description": "Test runners for the cwicly maintenance fork. Deliberately separate from the plugin's own composer.json: composition-c4's fetchComposerDeps clones lock.packages ++ lock.packages-dev at eval time with allRefs=true, so anything added to the root manifest is paid for on every `nix build .#zip`. Static analysers are NOT here either -- phpstan comes from nixpkgs.",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.3",
+        "brain/monkey": "^2.6",
+        "mockery/mockery": "^1.6",
+        "phpstan/phpdoc-parser": "^2.0",
+        "phpunit/phpunit": "^11.5"
+    },
+    "config": {
+        "platform": {
+            "php": "8.3"
+        },
+        "allow-plugins": false,
+        "sort-packages": true,
+        "platform-check": false
+    },
+    "replace": {
+        "phpstan/phpstan": "*"
+    }
+}

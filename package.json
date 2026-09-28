@@ -1,0 +1,13 @@
+{
+  "name": "cwicly",
+  "private": true,
+  "version": "1.4.8",
+  "type": "module",
+  "description": "Tooling for the Cwicly maintenance fork: wp-playground test harness only. There is no JS build step — build/ and core/includes/js/*/build are committed artifacts that the asset tests verify.",
+  "scripts": {
+    "test:assets": "node tests/playground/run-assets.mjs",
+    "test:e2e": "node tests/playground/run-e2e.mjs",
+    "test:browser": "node tests/playground/run-browser.mjs",
+    "test": "npm run test:assets && npm run test:e2e"
+  }
+}

@@ -3,7 +3,7 @@ Contributors: cwicly, strange tech
 Tags: page builder, editor, landing page, drag-and-drop, elementor, visual editor, wysiwyg, design, maintenance mode, coming soon, under construction, website builder, landing page builder, front-end builder
 Requires at least: 6.1
 Tested up to: 6.6.2
-Requires PHP: 7.4
+Requires PHP: 8.3
 Stable tag: 1.4.8
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html

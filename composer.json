@@ -1,5 +1,46 @@
 {
+    "name": "avunu/cwicly",
+    "description": "Maintenance fork of the Cwicly WordPress plugin: a Gutenberg design toolkit. Self-updates from GitHub release assets via plugin-update-checker.",
+    "type": "wordpress-plugin",
+    "version": "1.4.8",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "Avunu LLC",
+            "email": "mail@avu.nu"
+        }
+    ],
     "require": {
+        "php": ">=8.3",
+        "avunu/gutenberg-downgrade": "*",
         "yahnis-elsts/plugin-update-checker": "^5.6"
+    },
+    "require-dev": {
+        "php-stubs/wordpress-stubs": "^7.0",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "phpstan/phpdoc-parser": "^2.0"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../gutenberg-downgrade",
+            "options": {
+                "symlink": false
+            }
+        }
+    ],
+    "conflict": {
+        "avunu/gutenberg-downgrade": "<1.0"
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "platform": {
+            "php": "8.3.0"
+        },
+        "platform-check": false
+    },
+    "scripts": {
+        "phpstan": "phpstan analyse --memory-limit=2G"
     }
 }

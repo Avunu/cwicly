@@ -1,0 +1,17 @@
+{
+	"name": "cwicly-tests",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "wp-playground based runtime tests for the cwicly maintenance fork. Isolated from the root package so its heavy deps (@wp-playground/cli, playwright-core) never touch tooling.",
+	"scripts": {
+		"test:assets": "node run-assets.mjs",
+		"test:e2e": "node run-e2e.mjs",
+		"test:browser": "node run-browser.mjs",
+		"test": "node run-assets.mjs && node run-e2e.mjs"
+	},
+	"devDependencies": {
+		"@wp-playground/cli": "^3.1.55",
+		"playwright-core": "^1.49.0"
+	}
+}

@@ -9,8 +9,13 @@
  * Text Domain:       cwicly
  * Requires at least: 6.1
  * Tested up to:      6.6.2
+ * Requires PHP:      8.3
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ *
+ * x-release-please-start-version
+ * Version:           1.4.8
+ * x-release-please-end
  *
  * @package cwicly
  */
@@ -35,11 +40,14 @@ $cwiclyUpdateChecker = PucFactory::buildUpdateChecker(
 );
 
 // Use GitHub releases for updates - ship exactly one plugin zip per release.
-// Asset naming: cwicly-plugin_v<version>.zip
-$cwiclyUpdateChecker->getVcsApi()->enableReleaseAssets( '/^cwicly-plugin_v[\d.]+\.zip$/i' );
+// The Nix build names the asset cwicly-plugin_v<version>.zip; match any zip so
+// the pattern never has to change again.
+$cwiclyUpdateChecker->getVcsApi()->enableReleaseAssets( '/\.zip$/i' );
 
 // Define Version.
+// x-release-please-start-version
 define( 'CWICLY_VERSION', '1.4.8' );
+// x-release-please-end
 
 // Define WordPress.
 define( 'WORDPRESS_VERSION', get_bloginfo( 'version' ) );
@@ -113,7 +121,7 @@ add_action( 'init', 'cwicly_set_script_translations' );
 require_once CWICLY_DIR_PATH . 'core/includes/helpers/class-cwicly-initial.php'; // Initial Cwicly Data.
 
 // Version Check & Include Core.
-if ( ! version_compare( PHP_VERSION, '5.4', '>=' ) ) {
+if ( ! version_compare( PHP_VERSION, '8.3', '>=' ) ) {
 	add_action( 'admin_notices', array( 'Cwicly_Initial', 'php_error_notice' ) ); // PHP Version Check.
 } elseif ( ! version_compare( get_bloginfo( 'version' ), '5.6', '>=' ) ) {
 	add_action( 'admin_notices', array( 'Cwicly_Initial', 'wordpress_error_notice' ) ); // WordPress Version Check.

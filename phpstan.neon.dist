@@ -1,0 +1,49 @@
+includes:
+    # Bootstraps php-stubs/wordpress-stubs and adds WordPress-aware rules
+    # (hook callback signatures, dynamic return types, WP constants).
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    # Legacy codebase (~450 files of untyped procedural PHP): start low and
+    # raise as files are cleaned. The gate is that it stays green, not that
+    # it is strict.
+    level: 2
+    phpVersion:
+        min: 80300
+        max: 80400
+    paths:
+        - cwicly.php
+        - core/includes/classes/
+        - core/includes/api/
+    excludePaths:
+        # Vendored third-party libraries: never analysed (scssphp, svg-sanitizer)
+        # and the bundled ACF / block definitions / JS artifacts are out of scope.
+        - core/lib/*
+        - core/includes/acf/*
+        - core/includes/blocks/*
+        - core/includes/dynamic/*
+        - core/includes/helpers/*
+        - core/includes/js/*
+        - vendor/*
+    bootstrapFiles:
+        - phpstan-bootstrap.php
+    # PHPDoc types on WordPress boundaries (registry objects, filter payloads)
+    # are not runtime-enforced; keep defensive checks without false positives.
+    treatPhpDocTypesAsCertain: false
+    dynamicConstantNames:
+        - CWICLY_VERSION
+        - CWICLY_BETA
+        - CWICLY_IS_FREE
+        - CC_WOOCOMMERCE
+        - CWICLY_API_VERSION
+        - SCRIPT_DEBUG
+        - REST_REQUEST
+        - WP_ADMIN
+        - WP_DEBUG
+    ignoreErrors:
+        # PucFactory::buildUpdateChecker() is typed as a broad union; narrowing it
+        # would require referencing the version-suffixed (v5pX) class names, which
+        # break on every plugin-update-checker minor release.
+        -
+            message: '#Call to an undefined method YahnisElsts\\PluginUpdateChecker.*#'
+            path: cwicly.php
