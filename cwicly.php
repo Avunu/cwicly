@@ -9,6 +9,7 @@
  * Text Domain:       cwicly
  * Requires at least: 6.1
  * Tested up to:      6.6.2
+ * Update URI:        false
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  *
@@ -18,33 +19,6 @@
 // Exit if accessed directly.
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
-}
-
-// Load Composer autoloader for plugin-update-checker.
-require_once __DIR__ . '/vendor/autoload.php';
-
-use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
-
-// Determine if this is the free version based on ACF bundling.
-// The full version includes ACF Pro, the free version does not.
-if ( ! defined( 'CWICLY_IS_FREE' ) ) {
-	define( 'CWICLY_IS_FREE', ! file_exists( __DIR__ . '/core/includes/acf/acf.php' ) );
-}
-
-// Initialize GitHub update checker.
-$cwiclyUpdateChecker = PucFactory::buildUpdateChecker(
-	'https://github.com/StrangeTechDev/cwicly/',
-	__FILE__,
-	'cwicly'
-);
-
-// Use GitHub releases for updates - select the appropriate asset based on version type.
-// Asset naming: cwicly-plugin_v1.4.8-free.zip (free) or cwicly-plugin_v1.4.8.zip (full).
-if ( CWICLY_IS_FREE ) {
-	$cwiclyUpdateChecker->getVcsApi()->enableReleaseAssets( '/-free\.zip$/i' );
-} else {
-	// Match the full version zip (ends with version number.zip, NOT -free.zip).
-	$cwiclyUpdateChecker->getVcsApi()->enableReleaseAssets( '/cwicly-plugin_v[\d.]+\.zip$/i' );
 }
 
 // Define Version.
@@ -73,12 +47,6 @@ define( 'CWICLY_FILE', __FILE__ );
 //define( 'CWICLY_LICENSE_PAGE', 'cwicly' );
 
 define( 'CWICLY_ITEM_NAME', 'Cwicly' );
-
-define( 'CC_STORE_URL', 'https://cwicly.com' );
-
-define( 'CC_PLUGIN_ID', 73 );
-
-define( 'CC_THEME_ID', 71 );
 
 define( 'CC_CLASSES', get_option( 'cwicly_classes_add' ) );
 
@@ -121,9 +89,8 @@ function cwicly_set_script_translations() {
 }
 add_action( 'init', 'cwicly_set_script_translations' );
 
-// Define path and URL to the ACF plugin.
-define( 'MY_ACF_PATH', plugin_dir_path( __FILE__ ) . 'core/includes/acf/' );
-define( 'MY_ACF_URL', plugin_dir_url( __FILE__ ) . 'core/includes/acf/' );
+// ACF is no longer bundled. Install the official ACF (or ACF Pro) plugin to use
+// dynamic ACF fields; Cwicly detects it via class_exists( 'ACF' ).
 
 // Include Notices File.
 require_once CWICLY_DIR_PATH . 'core/includes/helpers/class-cwicly-initial.php'; // Initial Cwicly Data.
