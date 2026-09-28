@@ -110,13 +110,7 @@ class Helpers {
 		}
 
 		// Running CLI.
-		if ( stristr( PHP_OS, 'WIN' ) ) {
-			return gethostbyname( php_uname( 'n' ) );
-		} else {
-			$ifconfig = shell_exec( '/sbin/ifconfig eth0' );
-			preg_match( '/addr:([\d\.]+)/', $ifconfig, $match );
-			return $match[1];
-		}
+		return gethostbyname( php_uname( 'n' ) );
 	}
 
 	/**
@@ -1544,6 +1538,18 @@ class Helpers {
 	 */
 	public static function permissions_check_admin() {
 		return current_user_can( 'manage_options' );
+	}
+
+	/**
+	 * Check if a given request may upload plugin assets (icons, fonts).
+	 *
+	 * edit_posts alone includes contributors, who cannot upload media in
+	 * WordPress; file-writing REST routes must require both capabilities.
+	 *
+	 * @return bool
+	 */
+	public static function permissions_check_uploads() {
+		return current_user_can( 'edit_posts' ) && current_user_can( 'upload_files' );
 	}
 
 	/**
