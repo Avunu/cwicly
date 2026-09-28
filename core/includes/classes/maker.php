@@ -13,6 +13,7 @@ require_once CWICLY_DIR_PATH . 'core/includes/classes/class-options.php';
 require_once CWICLY_DIR_PATH . 'core/includes/classes/class-setup.php';
 require_once CWICLY_DIR_PATH . 'core/includes/classes/class-settings.php';
 require_once CWICLY_DIR_PATH . 'core/includes/classes/class-signature.php';
+require_once CWICLY_DIR_PATH . 'core/includes/classes/class-upload-paths.php';
 require_once CWICLY_DIR_PATH . 'core/includes/classes/class-woocommerce.php';
 require_once CWICLY_DIR_PATH . 'core/includes/classes/class-backend.php';
 require_once CWICLY_DIR_PATH . 'core/includes/classes/class-themer.php';
