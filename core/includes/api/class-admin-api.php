@@ -15,6 +15,9 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Cwicly Query API.
  */
 class Admin_API extends \WP_REST_Controller {
+	private const MAX_ICON_BYTES = 2097152;
+	private const MAX_FONT_BYTES = 10485760;
+
 	/**
 	 * Constructor
 	 */
@@ -28,24 +31,9 @@ class Admin_API extends \WP_REST_Controller {
 	public function register_routes() {
 		$namespace = 'cwicly/v' . CWICLY_API_VERSION;
 
-		$base = 'upload_collection';
 		register_rest_route(
 			$namespace,
-			'/' . $base,
-			array(
-				array(
-					'methods'             => \WP_REST_Server::CREATABLE,
-					'callback'            => array( $this, 'upload_collection' ),
-					'permission_callback' => array( '\Cwicly\Helpers', 'permissions_check' ),
-					'args'                => array(),
-				),
-			)
-		);
-
-		$base2 = 'upload_icon';
-		register_rest_route(
-			$namespace,
-			'/' . $base2,
+			'/upload_icon',
 			array(
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
@@ -56,10 +44,9 @@ class Admin_API extends \WP_REST_Controller {
 			)
 		);
 
-		$base3 = 'upload_font';
 		register_rest_route(
 			$namespace,
-			'/' . $base3,
+			'/upload_font',
 			array(
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
@@ -70,10 +57,9 @@ class Admin_API extends \WP_REST_Controller {
 			)
 		);
 
-		$base4 = 'settings';
 		register_rest_route(
 			$namespace,
-			'/' . $base4,
+			'/settings',
 			array(
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
@@ -84,10 +70,9 @@ class Admin_API extends \WP_REST_Controller {
 			)
 		);
 
-		$base5 = 'themes';
 		register_rest_route(
 			$namespace,
-			'/' . $base5,
+			'/themes',
 			array(
 				array(
 					'methods'             => \WP_REST_Server::READABLE,
@@ -98,10 +83,9 @@ class Admin_API extends \WP_REST_Controller {
 			)
 		);
 
-		$base6 = 'cwicly_global_classes_save';
 		register_rest_route(
 			$namespace,
-			'/' . $base6,
+			'/cwicly_global_classes_save',
 			array(
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
@@ -114,62 +98,6 @@ class Admin_API extends \WP_REST_Controller {
 	}
 
 	/**
-	 * Process Collection
-	 *
-	 * @param \WP_REST_Request $request Full details about the request.
-	 */
-	public function upload_collection( $request ) {
-		try {
-			$params = $request->get_params();
-			if ( $params['imgBase64'] && $params['random'] ) {
-				$img       = $params['imgBase64'];
-				$img       = str_replace( 'data:image/png;base64,', '', $img );
-				$img       = str_replace( ' ', '+', $img );
-				$file_data = base64_decode( $img );
-
-				$file_name = '' . $params['random'] . '.png';
-
-				global $wp_filesystem;
-				if ( ! $wp_filesystem ) {
-					require_once ABSPATH . 'wp-admin/includes/file.php';
-				}
-
-				$upload_dir = wp_upload_dir();
-				$dir        = trailingslashit( $upload_dir['basedir'] ) . 'cwicly/my-collection/';
-
-				WP_Filesystem( false, $upload_dir['basedir'], true );
-
-				if ( ! $wp_filesystem->is_dir( $dir ) ) {
-					$wp_filesystem->mkdir( $dir );
-				}
-				$target_file = $dir . basename( $file_name );
-
-				file_put_contents( $target_file, $file_data );
-			}
-			if ( isset( $params['toDelete'] ) ) {
-				require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-base.php';
-				require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php';
-				$wp_filesystem_direct = new \WP_Filesystem_Direct( '' );
-				$file_name            = '' . $params['toDelete'] . '.png';
-				$upload_dir           = wp_upload_dir();
-				$dir                  = trailingslashit( $upload_dir['basedir'] ) . 'cwicly/my-collection/' . $file_name . '';
-				if ( file_exists( $dir ) ) {
-					$wp_filesystem_direct->delete( $dir, true );
-				}
-			}
-			return array(
-				'success' => true,
-				'message' => 'Successful upload',
-			);
-		} catch ( \Exception $e ) {
-			return array(
-				'success' => false,
-				'message' => $e->getMessage(),
-			);
-		}
-	}
-
-	/**
 	 * Process Icon upload
 	 *
 	 *  @param \WP_REST_Request $request Full details about the request.
@@ -178,38 +106,51 @@ class Admin_API extends \WP_REST_Controller {
 		try {
 			$files = $request->get_file_params();
 
+			if ( empty( $files['file'] ) || empty( $files['file']['name'] ) || empty( $files['file']['tmp_name'] ) ) {
+				return new \WP_Error( 'no_file', 'No file uploaded.', array( 'status' => 400 ) );
+			}
+
 			$file = $files['file'];
-
-			// Check if file is svg, if not, return error.
-			$ext = pathinfo( $file['name'], PATHINFO_EXTENSION );
-			if ( 'svg' !== $ext ) {
-				return array(
-					'success' => false,
-					'message' => 'Only svg files are allowed!',
-				);
+			if ( isset( $file['error'] ) && UPLOAD_ERR_OK !== (int) $file['error'] ) {
+				return new \WP_Error( 'upload_failed', 'The icon upload failed.', array( 'status' => 400 ) );
 			}
 
-			global $wp_filesystem;
-			if ( ! $wp_filesystem ) {
-				require_once ABSPATH . 'wp-admin/includes/file.php';
+			$icon_name = pathinfo( (string) $file['name'], PATHINFO_FILENAME );
+			$extension = strtolower( pathinfo( (string) $file['name'], PATHINFO_EXTENSION ) );
+			if ( 'svg' !== $extension || ! Upload_Paths::is_safe_segment( $icon_name ) ) {
+				return new \WP_Error( 'invalid_icon_name', 'Only safely named SVG files are allowed.', array( 'status' => 400 ) );
 			}
 
-			$upload_dir  = wp_upload_dir();
-			$dir         = trailingslashit( $upload_dir['basedir'] ) . 'cwicly/icons/';
-			$target_file = $dir . basename( $file['name'] );
-
-			WP_Filesystem( false, $upload_dir['basedir'], true );
-
-			if ( ! $wp_filesystem->is_dir( $dir ) ) {
-				$wp_filesystem->mkdir( $dir );
+			$file_size = filesize( $file['tmp_name'] );
+			if ( false === $file_size || $file_size > self::MAX_ICON_BYTES ) {
+				return new \WP_Error( 'file_too_large', 'SVG files must be 2 MB or smaller.', array( 'status' => 400 ) );
 			}
 
-			move_uploaded_file( $file['tmp_name'], $target_file );
+			$svg = file_get_contents( $file['tmp_name'] );
+			if ( false === $svg ) {
+				return new \WP_Error( 'unreadable_svg', 'Unable to read the SVG file.', array( 'status' => 400 ) );
+			}
+
+			$svg = Svg::sanitize_inline( $svg );
+			if ( '' === $svg || 1 !== preg_match( '/<svg(?:\s|>)/i', $svg ) ) {
+				return new \WP_Error( 'invalid_svg', 'The SVG file is invalid or unsafe.', array( 'status' => 400 ) );
+			}
+
+			$scope = $this->prepare_upload_scope( 'icons' );
+			if ( false === $scope ) {
+				return new \WP_Error( 'upload_directory_error', 'Unable to prepare the icon directory.', array( 'status' => 500 ) );
+			}
+
+			$target_file = Upload_Paths::resolve_target( $scope, array( $icon_name ), '.svg' );
+			if ( false === $target_file || false === file_put_contents( $target_file, $svg, LOCK_EX ) ) {
+				return new \WP_Error( 'upload_write_failed', 'Unable to save the SVG file.', array( 'status' => 500 ) );
+			}
+
 			return array(
 				'success' => true,
 				'message' => 'Successful upload',
 			);
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			return array(
 				'success' => false,
 				'message' => $e->getMessage(),
@@ -225,65 +166,79 @@ class Admin_API extends \WP_REST_Controller {
 	public function upload_font( $request ) {
 		try {
 			$params = $request->get_params();
-
-			if ( $request->get_file_params() ) {
-				$files = $request->get_file_params();
-			}
+			$files  = $request->get_file_params();
 
 			if ( isset( $params['deleteFontVariation'] ) && $params['deleteFontVariation'] && isset( $params['fontName'] ) && $params['fontName'] ) {
-				$font_name           = $params['fontName'];
-				$font_name_variation = $params['deleteFontVariation'];
-				$upload_dir          = wp_upload_dir();
-				$dir                 = trailingslashit( $upload_dir['basedir'] ) . 'cwicly/fonts/' . $font_name . '/' . $font_name_variation . '.woff2';
-				wp_delete_file( $dir );
+				$font_name           = (string) $params['fontName'];
+				$font_name_variation = (string) $params['deleteFontVariation'];
+				if ( ! Upload_Paths::is_safe_segment( $font_name ) || ! Upload_Paths::is_safe_segment( $font_name_variation ) ) {
+					return new \WP_Error( 'invalid_font_path', 'Invalid font path.', array( 'status' => 400 ) );
+				}
+
+				$scope = $this->prepare_upload_scope( 'fonts' );
+				$file  = false === $scope ? false : Upload_Paths::resolve_existing( $scope, array( $font_name, $font_name_variation ), '.woff2' );
+				if ( $file ) {
+					wp_delete_file( $file );
+				}
 			}
 
 			if ( isset( $params['deleteFont'] ) ) {
-				require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-base.php';
-				require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php';
-				$wp_filesystem_direct = new \WP_Filesystem_Direct( '' );
-				$font_name            = $params['deleteFont'];
-				$upload_dir           = wp_upload_dir();
-				$dir                  = trailingslashit( $upload_dir['basedir'] ) . 'cwicly/fonts/' . $font_name . '/';
-				if ( file_exists( $dir ) ) {
-					$wp_filesystem_direct->delete( $dir, true );
+				$font_name = (string) $params['deleteFont'];
+				if ( ! Upload_Paths::is_safe_segment( $font_name ) ) {
+					return new \WP_Error( 'invalid_font_path', 'Invalid font path.', array( 'status' => 400 ) );
+				}
+
+				$scope    = $this->prepare_upload_scope( 'fonts' );
+				$font_dir = false === $scope ? false : Upload_Paths::resolve_existing( $scope, array( $font_name ) );
+				if ( $font_dir ) {
+					require_once ABSPATH . 'wp-admin/includes/file.php';
+					global $wp_filesystem;
+					if ( ! WP_Filesystem() || ! $wp_filesystem || ! $wp_filesystem->delete( $font_dir, true, 'd' ) ) {
+						return new \WP_Error( 'font_delete_failed', 'Unable to delete the font directory.', array( 'status' => 500 ) );
+					}
 				}
 			}
 
 			if ( isset( $files['file'] ) && isset( $params['fontName'] ) ) {
-
-				// Check if file is woff2, if not, return error.
-				$ext = pathinfo( $files['file']['name'], PATHINFO_EXTENSION );
-				if ( 'woff2' !== $ext ) {
-					return array(
-						'success' => false,
-						'message' => 'Only woff2 files are allowed!',
-					);
+				$file      = $files['file'];
+				$font_name = (string) $params['fontName'];
+				$file_name = isset( $file['name'] ) ? (string) $file['name'] : '';
+				if ( ! Upload_Paths::is_safe_segment( $font_name ) || ! Upload_Paths::is_safe_segment( $file_name ) ) {
+					return new \WP_Error( 'invalid_font_path', 'Invalid font path.', array( 'status' => 400 ) );
 				}
 
-				global $wp_filesystem;
-				if ( ! $wp_filesystem ) {
-					require_once ABSPATH . 'wp-admin/includes/file.php';
-				}
-				$font_name   = $params['fontName'];
-				$file        = $files['file'];
-				$upload_dir  = wp_upload_dir();
-				$dir         = trailingslashit( $upload_dir['basedir'] ) . '/cwicly/fonts/' . $font_name . '/';
-				$target_file = $dir . basename( $file['name'] );
-
-				WP_Filesystem( false, $upload_dir['basedir'], true );
-
-				if ( ! $wp_filesystem->is_dir( $dir ) ) {
-					wp_mkdir_p( $dir );
+				if ( isset( $file['error'] ) && UPLOAD_ERR_OK !== (int) $file['error'] ) {
+					return new \WP_Error( 'upload_failed', 'The font upload failed.', array( 'status' => 400 ) );
 				}
 
-				move_uploaded_file( $file['tmp_name'], $target_file );
+				if ( 'woff2' !== strtolower( pathinfo( $file_name, PATHINFO_EXTENSION ) ) ) {
+					return new \WP_Error( 'wrong_file_type', 'Only WOFF2 files are allowed.', array( 'status' => 400 ) );
+				}
+
+				$file_size = ! empty( $file['tmp_name'] ) ? filesize( $file['tmp_name'] ) : false;
+				if ( false === $file_size || $file_size > self::MAX_FONT_BYTES ) {
+					return new \WP_Error( 'file_too_large', 'WOFF2 files must be 10 MB or smaller.', array( 'status' => 400 ) );
+				}
+
+				if ( 'wOF2' !== file_get_contents( $file['tmp_name'], false, null, 0, 4 ) ) {
+					return new \WP_Error( 'invalid_woff2', 'The uploaded file is not a valid WOFF2 font.', array( 'status' => 400 ) );
+				}
+
+				$scope = $this->prepare_upload_scope( 'fonts' );
+				if ( false === $scope || ( ! is_dir( $scope . $font_name ) && ! wp_mkdir_p( $scope . $font_name ) ) ) {
+					return new \WP_Error( 'upload_directory_error', 'Unable to prepare the font directory.', array( 'status' => 500 ) );
+				}
+
+				$target_file = Upload_Paths::resolve_target( $scope, array( $font_name, $file_name ) );
+				if ( false === $target_file || ! move_uploaded_file( $file['tmp_name'], $target_file ) ) {
+					return new \WP_Error( 'upload_write_failed', 'Unable to save the WOFF2 file.', array( 'status' => 500 ) );
+				}
 			}
 			return array(
 				'success' => true,
 				'message' => 'Successful upload',
 			);
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			return array(
 				'success' => false,
 				'message' => $e->getMessage(),
@@ -298,31 +253,55 @@ class Admin_API extends \WP_REST_Controller {
 	 */
 	public function settings( $request ) {
 		try {
-			if ( $request->get_params() ) {
-				$params = $request->get_params();
-			}
+			$params = $request->get_params();
 
 			if ( isset( $params['deleteIcon'] ) ) {
-				global $wp_filesystem;
-				if ( ! $wp_filesystem ) {
-					require_once ABSPATH . 'wp-admin/includes/file.php';
+				$icon_name = (string) $params['deleteIcon'];
+				if ( ! Upload_Paths::is_safe_segment( $icon_name ) ) {
+					return new \WP_Error( 'invalid_icon_path', 'Invalid icon path.', array( 'status' => 400 ) );
 				}
-				$upload_dir  = wp_upload_dir();
-				$dir         = trailingslashit( $upload_dir['basedir'] ) . 'cwicly/icons/';
-				$target_file = $dir . $params['deleteIcon'] . '.svg';
-				wp_delete_file( $target_file );
+
+				$scope       = $this->prepare_upload_scope( 'icons' );
+				$target_file = false === $scope ? false : Upload_Paths::resolve_existing( $scope, array( $icon_name ), '.svg' );
+				if ( $target_file ) {
+					wp_delete_file( $target_file );
+				}
 			}
 
 			return array(
 				'success' => true,
-				'message' => 'Global CSS updated!',
+				'message' => 'Settings updated.',
 			);
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
 			return array(
 				'success' => false,
 				'message' => $e->getMessage(),
 			);
 		}
+	}
+
+	/**
+	 * Ensure one trusted plugin upload directory exists.
+	 *
+	 * @param string $area Allowed upload area.
+	 * @return string|false
+	 */
+	private function prepare_upload_scope( $area ) {
+		if ( ! in_array( $area, array( 'fonts', 'icons' ), true ) ) {
+			return false;
+		}
+
+		$upload_dir = wp_upload_dir();
+		if ( empty( $upload_dir['basedir'] ) || ! empty( $upload_dir['error'] ) ) {
+			return false;
+		}
+
+		$scope = trailingslashit( $upload_dir['basedir'] ) . 'cwicly/' . $area . '/';
+		if ( ! is_dir( $scope ) && ! wp_mkdir_p( $scope ) ) {
+			return false;
+		}
+
+		return $scope;
 	}
 
 	/**
