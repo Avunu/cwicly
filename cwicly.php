@@ -9,7 +9,6 @@
  * Text Domain:       cwicly
  * Requires at least: 6.1
  * Tested up to:      6.6.2
- * Update URI:        false
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  *
@@ -20,6 +19,24 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+// Load Composer autoloader for plugin-update-checker.
+require_once __DIR__ . '/vendor/autoload.php';
+
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+// Initialize GitHub update checker.
+// Updates are published as a single release asset zip per tag on the
+// Avunu/cwicly repository.
+$cwiclyUpdateChecker = PucFactory::buildUpdateChecker(
+	'https://github.com/Avunu/cwicly/',
+	__FILE__,
+	'cwicly'
+);
+
+// Use GitHub releases for updates - ship exactly one plugin zip per release.
+// Asset naming: cwicly-plugin_v<version>.zip
+$cwiclyUpdateChecker->getVcsApi()->enableReleaseAssets( '/^cwicly-plugin_v[\d.]+\.zip$/i' );
 
 // Define Version.
 define( 'CWICLY_VERSION', '1.4.8' );
