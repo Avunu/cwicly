@@ -128,7 +128,7 @@ class Backend_API extends \WP_REST_Controller {
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
 					'callback'            => array( $this, 'delete_local_font' ),
-					'permission_callback' => array( '\Cwicly\Helpers', 'permissions_check' ),
+					'permission_callback' => array( '\Cwicly\Helpers', 'permissions_check_uploads' ),
 					'args'                => array(),
 				),
 			)
@@ -142,7 +142,7 @@ class Backend_API extends \WP_REST_Controller {
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
 					'callback'            => array( $this, 'upload_local_font' ),
-					'permission_callback' => array( '\Cwicly\Helpers', 'permissions_check' ),
+					'permission_callback' => array( '\Cwicly\Helpers', 'permissions_check_uploads' ),
 					'args'                => array(),
 				),
 			)
@@ -156,7 +156,7 @@ class Backend_API extends \WP_REST_Controller {
 				array(
 					'methods'             => \WP_REST_Server::CREATABLE,
 					'callback'            => array( $this, 'delete_local_custom_variant' ),
-					'permission_callback' => array( '\Cwicly\Helpers', 'permissions_check' ),
+					'permission_callback' => array( '\Cwicly\Helpers', 'permissions_check_uploads' ),
 					'args'                => array(),
 				),
 			)
@@ -480,6 +480,38 @@ class Backend_API extends \WP_REST_Controller {
 	 *
 	 * @return array
 	 */
+	/**
+	 * Reduce user query results to the fields required by editor selectors.
+	 *
+	 * WP_User objects contain password hashes, activation keys, roles, and
+	 * capabilities. Keep the legacy nested data shape for existing editor code,
+	 * but never serialize the full object through these REST responses.
+	 *
+	 * @param array $users User query results.
+	 * @return array
+	 */
+	private function prepare_user_summaries( $users ) {
+		$summaries = array();
+
+		foreach ( $users as $user ) {
+			$user_data = isset( $user->data ) && is_object( $user->data ) ? $user->data : $user;
+			if ( ! is_object( $user_data ) || ! isset( $user_data->ID ) ) {
+				continue;
+			}
+
+			$summary = array(
+				'ID'           => (int) $user_data->ID,
+				'user_login'   => isset( $user_data->user_login ) ? (string) $user_data->user_login : '',
+				'display_name' => isset( $user_data->display_name ) ? (string) $user_data->display_name : '',
+			);
+
+			$summary['data'] = $summary;
+			$summaries[]     = $summary;
+		}
+
+		return $summaries;
+	}
+
 	public function dynamics( $request ) {
 		$body = $request->get_body();
 		$body = json_decode( $body, true );
@@ -722,18 +754,21 @@ class Backend_API extends \WP_REST_Controller {
 							} elseif ( 'users' === $type ) {
 								$final = array();
 								if ( isset( $value['keyword'] ) ) {
-									$search = '*' . esc_attr( $value['keyword'] ) . '*';
-									$final  = get_users(
+									$search = '*' . sanitize_text_field( (string) $value['keyword'] ) . '*';
+									$users  = get_users(
 										array(
-											'search' => $search,
+											'search'         => $search,
 											'search_columns' => array(
 												'user_login',
 												'user_nicename',
 												'user_email',
 												'user_url',
 											),
+											'fields'         => array( 'ID', 'user_login', 'display_name' ),
+											'number'         => 20,
 										)
 									);
+									$final = $this->prepare_user_summaries( $users );
 								}
 							} elseif ( 'imagedetails' === $type ) {
 								$data                  = array();
@@ -2110,14 +2145,18 @@ class Backend_API extends \WP_REST_Controller {
 			} elseif ( $data->get_param( 'users' ) ) {
 				if ( $data->get_param( 'keyword' ) ) {
 					$search = $data->get_param( 'keyword' );
-					$users  = get_users( array( 'search' => $search ) );
+					$users  = get_users(
+						array(
+							'search' => $search,
+							'fields' => array( 'ID', 'user_login', 'display_name' ),
+							'number' => 20,
+						)
+					);
 
-					return rest_ensure_response( $users );
+					return rest_ensure_response( $this->prepare_user_summaries( $users ) );
 				} else {
-					$final = array();
-
-					$users = get_users( array( 'fields' => array( 'ID', 'user_login' ) ) );
-					return rest_ensure_response( $users );
+					$users = get_users( array( 'fields' => array( 'ID', 'user_login', 'display_name' ) ) );
+					return rest_ensure_response( $this->prepare_user_summaries( $users ) );
 				}
 			}
 		} catch ( \Exception $e ) {
