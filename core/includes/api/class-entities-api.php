@@ -435,9 +435,20 @@ class Entities_API extends \WP_REST_Controller {
 	 * @return array
 	 */
 	public function entities_post( $request ) {
-		$body = $request->get_body();
-		$body = json_decode( $body, true );
+		$body = json_decode( (string) $request->get_body(), true );
+		if ( ! is_array( $body ) ) {
+			$body = array();
+		}
 		foreach ( $body as $key => $value ) {
+			// [security] Only the plugin's own editor-writable options may be set
+			// here. This loop previously wrote ANY request key with update_option,
+			// so an edit_posts user could set core options (default_role, siteurl,
+			// users_can_register) or the cwicly_salt signing secret → site
+			// takeover / privilege escalation. can_write_option() rejects core
+			// options and requires manage_options for the security-governing keys.
+			if ( ! Capabilities::can_write_option( $key ) ) {
+				continue;
+			}
 			if ( 'cwicly_tailwind_configurations' === $key ) {
 				$permissions = Capabilities::permission( 'tailwind', 'configs', true );
 				if ( ! $permissions ) {

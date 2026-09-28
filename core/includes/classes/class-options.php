@@ -49,14 +49,18 @@ class Options {
 			if ( get_option( 'cwicly_css' ) ) {
 				delete_option( 'cwicly_css' );
 			}
-			if ( get_option( 'cwicly_theme_license_key' ) ) {
-				delete_option( 'cwicly_theme_license_key' );
-			}
-			if ( get_option( 'cwicly_plugin_license_key' ) ) {
-				delete_option( 'cwicly_plugin_license_key' );
-			}
-			if ( get_option( 'cwicly_theme_license_key_status' ) ) {
-				delete_option( 'cwicly_theme_license_key_status' );
+			// Cwicly has no license system. Remove credentials and status values
+			// left by any older installation, including values explicitly stored
+			// as false.
+			$legacy_license_options = array(
+				'cwicly_plugin_license_key',
+				'cwicly_plugin_license_key_status',
+				'cwicly_theme_license_key',
+				'cwicly_theme_license_key_status',
+				'cwicly_license_check',
+			);
+			foreach ( $legacy_license_options as $legacy_license_option ) {
+				delete_option( $legacy_license_option );
 			}
 
 			$global_classes = get_option( 'cwicly_global_classes' );

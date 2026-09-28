@@ -87,6 +87,9 @@ class Svg {
 
 		$sanitizer = new \enshrined\svgSanitize\Sanitizer();
 		$sanitizer->minify( true );
+		// [security] Strip remote references (external href/xlink:href/url()) so an
+		// uploaded SVG cannot phone out to other sites (SSRF / data exfiltration).
+		$sanitizer->removeRemoteReferences( true );
 
 		$svg = file_get_contents( $file['tmp_name'] );
 
@@ -95,6 +98,7 @@ class Svg {
 		$sanitizer->setAllowedAttrs( new Svg\Attributes() );
 
 		$svg = $sanitizer->sanitize( $svg );
+		$svg = self::strip_external_hrefs( $svg );
 
 		if ( ! $svg ) {
 			$file['error'] = __( 'Unable to read SVG file.', 'cwicly' );
@@ -119,17 +123,46 @@ class Svg {
 		$sanitizer = new \enshrined\svgSanitize\Sanitizer();
 		$sanitizer->minify( true );
 		$sanitizer->removeXMLTag( true );
+		// [security] Strip remote references so an inline SVG cannot phone out.
+		$sanitizer->removeRemoteReferences( true );
 
 		// Allowed attributes and tags.
 		$sanitizer->setAllowedTags( new Svg\Tags() );
 		$sanitizer->setAllowedAttrs( new Svg\Attributes() );
 
 		$svg = $sanitizer->sanitize( $svg );
+		$svg = self::strip_external_hrefs( $svg );
 
 		if ( ! $svg ) {
 			return '';
 		}
 
 		return $svg;
+	}
+
+	/**
+	 * Remove href / xlink:href attributes that point off-site so a sanitised SVG
+	 * cannot phone out to another origin (tracking pixels, data exfiltration).
+	 *
+	 * svg-sanitize's removeRemoteReferences() only strips whole-value `url(...)`
+	 * references; a plain `href="https://…"` or `//host/…` survives because
+	 * http(s) is an allowed protocol. This strips those, keeping internal
+	 * fragments (#id), data: URIs and same-document relative references.
+	 *
+	 * @param string $svg Sanitised SVG markup.
+	 * @return string
+	 */
+	private static function strip_external_hrefs( $svg ) {
+		if ( ! is_string( $svg ) || '' === $svg ) {
+			return $svg;
+		}
+		$out = preg_replace(
+			'/\s(?:xlink:)?href\s*=\s*(["\'])\s*(?:[a-z][a-z0-9+.\-]*:)?\/\/[^"\']*\1/i',
+			'',
+			$svg
+		);
+		// preg_replace returns null on PCRE failure (e.g. backtrack limit on a huge
+		// file); fall back to the already-sanitised markup rather than dropping it.
+		return null === $out ? $svg : $out;
 	}
 }

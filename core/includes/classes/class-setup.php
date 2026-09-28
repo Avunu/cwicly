@@ -233,10 +233,12 @@ class Setup {
 					update_option( 'cwicly_optimise', $optimise );
 				}
 				$welcome = admin_url( 'admin.php?page=cwicly-welcome' );
-				exit( esc_html( wp_safe_redirect( $welcome ) ) );
+				wp_safe_redirect( $welcome );
+				exit;
 			} else {
 				$settings = admin_url( 'admin.php?page=cwicly-settings' );
-				exit( esc_html( wp_safe_redirect( $settings ) ) );
+				wp_safe_redirect( $settings );
+				exit;
 			}
 		}
 	}
@@ -244,68 +246,50 @@ class Setup {
 	/**
 	 * Add a notice to the admin to let the user know that they need to regenerate the HTML.
 	 */
-	public static function enqueue_jquery_admin() {
-		wp_enqueue_script( 'jquery' );
-		wp_enqueue_script(
-			'cwicly-notify',
-			CWICLY_DIR_URL . 'core/assets/js/dismisser.js',
-			array( 'jquery' ),
-			CWICLY_VERSION,
-			false
-		);
-		wp_enqueue_script(
-			'cwicly-editor-enhancements',
-			CWICLY_DIR_URL . 'core/assets/js/editor-enhancements.js',
-			array( 'jquery' ),
-			CWICLY_VERSION,
-			false
-		);
+	public static function enqueue_jquery_admin( $hook_suffix ) {
+		$regenerate_notice = get_option( 'cwicly_regenerate_html' );
+		if ( 'true' === $regenerate_notice || ! $regenerate_notice ) {
+			wp_enqueue_script(
+				'cwicly-notify',
+				CWICLY_DIR_URL . 'core/assets/js/dismisser.js',
+				array( 'jquery' ),
+				CWICLY_VERSION,
+				true
+			);
+			wp_localize_script(
+				'cwicly-notify',
+				'cwiclyNotice',
+				array(
+					'nonce' => wp_create_nonce( 'cwicly_dismiss_notice' ),
+				)
+			);
+		}
+
+		if ( in_array( $hook_suffix, array( 'post.php', 'post-new.php', 'site-editor.php' ), true ) ) {
+			wp_enqueue_script(
+				'cwicly-editor-enhancements',
+				CWICLY_DIR_URL . 'core/assets/js/editor-enhancements.js',
+				array( 'jquery' ),
+				CWICLY_VERSION,
+				true
+			);
+		}
 	}
 
 	/**
 	 * AJAX handler to store the state of dismissible notices.
 	 */
 	public static function ajax_notice_handler() {
-		// Store it in the options table.
-		update_option( 'cwicly_regenerate_html', 'false' );
-	}
+		check_ajax_referer( 'cwicly_dismiss_notice', 'nonce' );
 
-	/**
-	 * Initialize the updater. Hooked into `init` to work with the
-	 * wp_version_check cron job, which allows auto-updates.
-	 */
-	/*public static function updater() {
-		// To support auto-updates, this needs to run during the wp_version_check cron job for privileged users.
-		$doing_cron = defined( 'DOING_CRON' ) && DOING_CRON;
-		if ( ! current_user_can( 'manage_options' ) && ! $doing_cron ) {
-			return;
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'You are not allowed to dismiss this notice.', 'cwicly' ) ), 403 );
 		}
 
-		// We don't need to check license anymore.
-		// phpcs:disable
-		// if ( get_option( 'cwicly_plugin_license_key_status' ) === 'valid' ) {
-
-		// if ( defined( 'CC_LICENSE_KEY' ) ) {
-		// phpcs:enable 
-			$cwicly_updater = new \Cwicly_Plugin_Updater(
-				CC_STORE_URL,
-				CWICLY_FILE,
-				array(
-					'version' => CWICLY_VERSION,
-					'license' => defined( 'CC_LICENSE_KEY' ) ? CC_LICENSE_KEY : 'free',
-					'item_id' => CC_PLUGIN_ID,
-					'author'  => 'Cwicly',
-					'beta'    => CWICLY_BETA,
-				)
-			);
-			// phpcs:disable
-			// }
-			// phpcs:enable
-
-		// phpcs:disable
-		// }
-		// phpcs:enable
-	}*/
+		// Store it in the options table.
+		update_option( 'cwicly_regenerate_html', 'false' );
+		wp_send_json_success();
+	}
 
 	/**
 	 * Add custom fields to menu item
