@@ -9,6 +9,7 @@
       "package-name": "cwicly",
       "extra-files": [
         "cwicly.php",
+        "readme.txt",
         {
           "type": "json",
           "path": "package.json",
