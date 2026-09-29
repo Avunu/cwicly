@@ -172,37 +172,50 @@
         };
 
         # The root composer.json's ../gutenberg-downgrade path repository is
-        # dropped for the sandbox: the sibling checkout does not exist there.
-        # It must go before `composer install` runs; the c4 hook is disabled in
-        # the derivations that use it (its `composer update --lock` validates
-        # declared repositories) and the repos are configured manually instead.
-        stripGdRepoFn = ''
-          cwiclyStripGdRepo() {
-            php -r '
-              $json = json_decode(file_get_contents("composer.json"), true, 512, JSON_THROW_ON_ERROR);
-              unset($json["repositories"]);
-              file_put_contents("composer.json", json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-            '
-          }
+        # dropped for the sandbox: the sibling checkout does not exist there, and
+        # the c4 hook's `composer update --lock` validates every declared
+        # repository. Stripping happens in patchPhase — strictly before the hook
+        # runs in configurePhase.
+        stripGdRepo = ''
+          php -r '
+            $json = json_decode(file_get_contents("composer.json"), true, 512, JSON_THROW_ON_ERROR);
+            unset($json["repositories"]);
+            file_put_contents("composer.json", json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+          '
         '';
 
         # Before installing, start from the GD-free lock and re-add the GD entry
-        # with a path dist pointing at the store copy. The hook's
-        # `composer update --lock` verifies the root package's composer.json
-        # against the lock's content-hash only — package entries are rewritten
-        # verbatim — so the modified dist survives it untouched.
+        # with a path dist pointing at the store copy. Runs in patchPhase, so
+        # the c4 hook's later `composer update --lock` sees the final package
+        # set; it verifies only the root package's composer.json against the
+        # lock's content-hash and rewrites package entries verbatim, so the
+        # injected path dist survives untouched.
+        #
+        # The dev-only szepeviktor/phpstan-wordpress package requires
+        # phpstan/phpstan, which is phar-only on Packagist and therefore absent
+        # from the c4 repo (and replaced by GD at runtime). Drop that one key
+        # from its lock entry: composer install honours the lock as-is, and the
+        # analysers that need phpstan get the nixpkgs binary instead.
         injectGdPathRepo = ''
           printf '%s' ${lib.escapeShellArg lockForC4Json} > composer.lock
+          printf '%s' ${lib.escapeShellArg (builtins.toJSON gdEntry)} > gd-entry.json
           mkdir -p vendor-src/${gdPkgName}
           cp -r ${gdSource}/. vendor-src/${gdPkgName}/
           chmod -R u+w vendor-src
           php -r '
             $lock = json_decode(file_get_contents("composer.lock"), true, 512, JSON_THROW_ON_ERROR);
-            $entry = json_decode(${lib.escapeShellArg (builtins.toJSON gdEntry)}, true, 512, JSON_THROW_ON_ERROR);
+            foreach ($lock["packages-dev"] as &$pkg) {
+              if ($pkg["name"] === "szepeviktor/phpstan-wordpress") {
+                unset($pkg["require"]["phpstan/phpstan"]);
+              }
+            }
+            unset($pkg);
+            $entry = json_decode(file_get_contents("gd-entry.json"), true, 512, JSON_THROW_ON_ERROR);
             $entry["dist"] = ["type" => "path", "url" => getcwd() . "/vendor-src/${gdPkgName}", "reference" => null];
             $lock["packages"][] = $entry;
             file_put_contents("composer.lock", json_encode($lock, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
           '
+          rm -f gd-entry.json
         '';
 
         # The test runners (PHPUnit, Brain Monkey) live in their own Composer
@@ -254,19 +267,15 @@
             pkgs.c4.composerSetupHook
           ];
 
-          # The c4 hook's `composer update --lock` validates declared repositories,
-          # including the ../gutenberg-downgrade path one that cannot exist in the
-          # sandbox. Disable it and configure the repos manually instead.
-          dontComposerSetupPreConfigure = true;
+          patchPhase = ''
+            runHook prePatch
+            ${stripGdRepo}
+            ${injectGdPathRepo}
+            runHook postPatch
+          '';
 
           buildPhase = ''
             runHook preBuild
-            ${stripGdRepoFn}
-            cwiclyStripGdRepo
-            composer config repo.packagist false
-            composer config repo.c4 '{"type": "composer", "url": "file://'"$composerDeps"'"}'
-            composer --no-ansi update --lock --no-install
-            ${injectGdPathRepo}
             composer --no-ansi install --no-dev --no-interaction --optimize-autoloader
             runHook postBuild
           '';
@@ -324,17 +333,17 @@
             pkgs.c4.composerSetupHook
           ];
 
-          # See pluginPackage: the c4 hook is disabled, repos configured manually.
-          dontComposerSetupPreConfigure = true;
+          # See pluginPackage: repos stripped and lock finalised in patchPhase,
+          # the c4 hook then configures them in configurePhase.
+          patchPhase = ''
+            runHook prePatch
+            ${stripGdRepo}
+            ${injectGdPathRepo}
+            runHook postPatch
+          '';
 
           buildPhase = ''
             runHook preBuild
-            ${stripGdRepoFn}
-            cwiclyStripGdRepo
-            composer config repo.packagist false
-            composer config repo.c4 '{"type": "composer", "url": "file://'"$composerDeps"'"}'
-            composer --no-ansi update --lock --no-install
-            ${injectGdPathRepo}
             composer --no-ansi install --no-interaction
             runHook postBuild
           '';
