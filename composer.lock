@@ -4,15 +4,21 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "70ab813883c6cb2bdad932b5d4861093",
+    "content-hash": "bfa3deb6774be6e9d857a3f1d321e8a1",
     "packages": [
         {
             "name": "avunu/gutenberg-downgrade",
             "version": "1.1.2",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/Avunu/gutenberg-downgrade.git",
+                "reference": "49bd7e1c7cf9b13661ef14c9209d400cb3ed5888"
+            },
             "dist": {
-                "type": "path",
-                "url": "../gutenberg-downgrade",
-                "reference": "9684993145af2b0d801bb2b40b573676e07a7aa5"
+                "type": "zip",
+                "url": "https://api.github.com/repos/Avunu/gutenberg-downgrade/zipball/49bd7e1c7cf9b13661ef14c9209d400cb3ed5888",
+                "reference": "49bd7e1c7cf9b13661ef14c9209d400cb3ed5888",
+                "shasum": ""
             },
             "require": {
                 "php": ">=8.3",
@@ -52,10 +58,11 @@
                 }
             ],
             "description": "Load the Gutenberg 18.5 (WordPress 6.6 series) block editor on current WordPress releases, for sites whose page builder clashes with the modern editor. Configure via wp-config.php — no admin settings.",
-            "transport-options": {
-                "symlink": false,
-                "relative": true
-            }
+            "support": {
+                "source": "https://github.com/Avunu/gutenberg-downgrade/tree/v1.1.2",
+                "issues": "https://github.com/Avunu/gutenberg-downgrade/issues"
+            },
+            "time": "2026-09-18T16:07:05+00:00"
         },
         {
             "name": "yahnis-elsts/plugin-update-checker",
