@@ -1263,6 +1263,12 @@ class Main_Query_API extends \WP_REST_Posts_Controller {
 				switch ( $arg[0] ) {
 					case 'acffield':
 					case 'acf_field':
+						// ACF is an optional integration in this fork: without the
+						// plugin installed there are no fields to resolve, and the
+						// acf_*/get_field_object calls below would fatal.
+						if ( ! function_exists( 'get_field_object' ) ) {
+							break;
+						}
 						$value      = '';
 						$block_name = '';
 						if ( isset( $arg[5] ) && $arg[5] ) {
@@ -1381,6 +1387,10 @@ class Main_Query_API extends \WP_REST_Posts_Controller {
 						break;
 
 					case 'acf_group_field':
+						// Optional ACF integration — see the acf_field case above.
+						if ( ! function_exists( 'get_field_object' ) ) {
+							break;
+						}
 						if ( isset( $arg[1] ) && $arg[1] && isset( $arg[2] ) && $arg[2] ) {
 							$value      = '';
 							$block_name = '';

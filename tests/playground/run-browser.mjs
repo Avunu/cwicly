@@ -24,17 +24,20 @@ function watch(page) {
 			w.failedAssets.length = 0;
 		},
 	};
-	page.on("pageerror", (e) => w.pageErrors.push(`${e.name}: ${e.message}`));
+	page.on("pageerror", (e) => {
+		const detail = e.stack ? String(e.stack).split("\n").slice(0, 3).join(" <- ") : `${e.name}: ${e.message}`;
+		w.pageErrors.push(detail.slice(0, 400));
+	});
 	page.on("console", (m) => {
 		if (m.type() !== "error") return;
 		const text = m.text();
 		// Chrome reports every 4xx resource as a console error; only our own
 		// assets matter (favicons and the like are noise in a fresh install).
 		if (/Failed to load resource/.test(text) && !m.location().url.includes(PLUGIN_SLUG)) return;
-		w.consoleErrors.push(text.slice(0, 300));
+		w.consoleErrors.push(`${text.slice(0, 200)} @ ${m.location()?.url ?? "?"}`.slice(0, 400));
 	});
 	page.on("response", (r) => {
-		if (r.status() >= 400 && r.url().includes(`/plugins/${PLUGIN_SLUG}/`)) {
+		if (r.status() >= 400) {
 			w.failedAssets.push(`${r.status()} ${r.url()}`);
 		}
 	});

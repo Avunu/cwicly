@@ -84,15 +84,11 @@
           else
             builtins.head (builtins.match pattern hit);
 
-        requireMajorMinor =
-          field: value:
-          if builtins.match "[0-9]+\\.[0-9]+" value == null then
-            throw "${mainFile} '${field}: ${value}' must be bare major.minor (e.g. 6.1)"
-          else
-            value;
-
-        wpTested = requireMajorMinor "Tested up to" (pluginHeader "Tested up to");
-        wpRequires = requireMajorMinor "Requires at least" (pluginHeader "Requires at least");
+        # plugin-update-checker's fixSupportedWordpressVersion() and WordPress's
+        # header parser accept patch versions; the bare major.minor requirement
+        # only exists for plugins that publish to wordpress.org. This fork ships
+        # via GitHub releases, so 6.6.2 is fine — just keep it parseable.
+        wpTested = pluginHeader "Tested up to";
 
         # ------------------------------------------------------------------ #
         # PHP / Composer vendor dependencies.                                 #
@@ -118,7 +114,10 @@
           if hit == null then
             throw "composer.lock has no ${gdPkgName} entry"
           else
-            builtins.removeAttrs hit [ "source" "dist" ];
+            builtins.removeAttrs hit [
+              "source"
+              "dist"
+            ];
 
         # The lock with the GD entry removed, computed at evaluation time (pure:
         # c4's own fetch-deps.nix uses lib.importJSON the same way). Passed to
@@ -137,10 +136,13 @@
             lock = builtins.fromJSON (builtins.readFile ./composer.lock);
             withoutGd = key: builtins.filter (p: p.name != gdPkgName) (lock.${key} or [ ]);
           in
-          builtins.toJSON (lock // {
-            packages = withoutGd "packages";
-            packages-dev = if withDev then withoutGd "packages-dev" else [ ];
-          });
+          builtins.toJSON (
+            lock
+            // {
+              packages = withoutGd "packages";
+              packages-dev = if withDev then withoutGd "packages-dev" else [ ];
+            }
+          );
 
         lockForC4Json = mkLockForC4 true;
         lockNoDevForC4Json = mkLockForC4 false;
@@ -502,7 +504,9 @@
           plugin-header = pkgs.runCommand "check-plugin-header" { inherit src; } ''
             set -euo pipefail
             get() {
-              sed -n -E "s|^[[:space:]]*\* $1:[[:space:]]*([^[:space:]]+)[[:space:]]*$|\1|p" "$src/${mainFile}"
+              # head -1: the release-please version markers mean a second
+              # "Version:" line can exist in the header block; take the first.
+              sed -n -E "s|^[[:space:]]*\* $1:[[:space:]]*([^[:space:]]+)[[:space:]]*$|\1|p" "$src/${mainFile}" | head -1
             }
             fail=0
             check() {
@@ -531,12 +535,12 @@
                 ];
                 inherit src;
               }
-            ''
-              set -euo pipefail
-              ${checkWorkTree devVendor}
-              phpstan analyse --no-progress --no-ansi --memory-limit=2G
-              touch "$out"
-            '';
+              ''
+                set -euo pipefail
+                ${checkWorkTree devVendor}
+                phpstan analyse --no-progress --no-ansi --memory-limit=2G
+                touch "$out"
+              '';
 
           unit = unitCheck "check-unit" php;
           # The same suite on the declared floor (Requires PHP: 8.3).

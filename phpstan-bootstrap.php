@@ -6,6 +6,12 @@ declare(strict_types=1);
 // of php-stubs/wordpress-stubs.
 define('WPINC', 'wp-includes');
 
+// Every cwicly file opens with `if ( ! defined( 'ABSPATH' ) ) exit;`. PHPStan's
+// symbol discovery parses the file and stops collecting declarations after the
+// unconditional exit — so without ABSPATH, scanDirectories finds nothing. The
+// plugin's own bootstrap defines it before loading anything; mirror that.
+define('ABSPATH', __DIR__ . '/');
+
 // cwicly.php reads these via get_option()/plugin paths at analysis time only;
 // defining them keeps the entrypoint analysable without a wp-load.
 define('CWICLY_FILE', __DIR__ . '/cwicly.php');

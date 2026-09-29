@@ -1,0 +1,72 @@
+version: 2
+
+# Keeps every ecosystem in this repo up to date. Updates land on `main` automatically
+# (see .github/workflows/dependabot-auto-merge.yml); release-please remains the gate for
+# actually cutting a release. Dep bumps use the `chore` type so they never force a release
+# on their own — they ride along with the next real release.
+#
+# avunu/gutenberg-downgrade is a path repository (../gutenberg-downgrade) and is not a
+# dependency Dependabot can resolve; it updates by bumping the flake input instead.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore
+    groups:
+      composer:
+        patterns: ["*"]
+
+  # The test toolchain is a separate Composer project on purpose (see
+  # tests/tools/composer.json); without its own entry the lock silently rots.
+  - package-ecosystem: composer
+    directory: /tests/tools
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    groups:
+      test-tools:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore
+    groups:
+      npm:
+        patterns: ["*"]
+
+  # The playground harness keeps its heavy deps out of the root lockfile.
+  - package-ecosystem: npm
+    directory: /tests/playground
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore
+    groups:
+      playground:
+        patterns: ["*"]
+
+  - package-ecosystem: nix
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    groups:
+      nix:
+        patterns: ["*"]

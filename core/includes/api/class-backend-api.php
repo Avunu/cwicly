@@ -555,7 +555,10 @@ class Backend_API extends \WP_REST_Controller {
 								}
 								$final = $terms;
 							} elseif ( 'acffield' === $type ) {
-								if ( isset( $value['acffield'] ) && isset( $value['postid'] ) ) {
+								if ( ! function_exists( 'get_field_object' ) ) {
+									// ACF is optional in this fork; without it there are no field groups.
+									$final = null;
+								} elseif ( isset( $value['acffield'] ) && isset( $value['postid'] ) ) {
 									$acfallfield = get_field_object( $value['acffield'], $value['postid'] );
 									if ( isset( $value['svgcontent'] ) && isset( $acfallfield['type'] ) && 'image' === $acfallfield['type'] && isset( $acfallfield['value']['ID'] ) ) {
 										$svg_content = '';
@@ -2064,12 +2067,21 @@ class Backend_API extends \WP_REST_Controller {
 				}
 				return rest_ensure_response( $taxonomies );
 			} elseif ( $data->get_param( 'acfgroups' ) ) {
+				if ( ! function_exists( 'acf_get_field_groups' ) ) {
+					return rest_ensure_response( array() );
+				}
 				$acfgroups = acf_get_field_groups();
 				return rest_ensure_response( $acfgroups );
 			} elseif ( $data->get_param( 'acffields' ) ) {
+				if ( ! function_exists( 'acf_get_fields' ) ) {
+					return rest_ensure_response( array() );
+				}
 				$acfallfields = acf_get_fields( $data->get_param( 'acffields' ) );
 				return rest_ensure_response( $acfallfields );
 			} elseif ( $data->get_param( 'acffield' ) && $data->get_param( 'postid' ) ) {
+				if ( ! function_exists( 'get_field_object' ) ) {
+					return rest_ensure_response( null );
+				}
 				$acfallfield = get_field_object( $data->get_param( 'acffield' ), $data->get_param( 'postid' ) );
 				if ( $data->get_param( 'svgcontent' ) && isset( $acfallfield['type'] ) && 'image' === $acfallfield['type'] && isset( $acfallfield['value']['ID'] ) ) {
 					$svg_content = '';

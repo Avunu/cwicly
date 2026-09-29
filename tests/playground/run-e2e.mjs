@@ -80,12 +80,23 @@ try {
 		t.check("front-end enqueue produced no notices", notices.length === 0, noticeDetail(notices));
 	}
 
-	// 4. Admin screens: the themer app enqueues via its admin_print_scripts hook,
-	// and the editor blocks bundle enqueues on the block-editor assets hook.
+	// 4. Admin screens: the themer app enqueues via its admin_print_scripts
+	// hook, and the editor blocks bundle enqueues on the block-editor assets
+	// hook. The snippet context has no logged-in user (playground's --login
+	// only applies to HTTP requests), and Cwicly registers its submenus with
+	// add_submenu_page(), which returns null for users lacking manage_options
+	// — so without an admin the per-page enqueue hook is never added. Set one
+	// up first; the real browser flow is covered by run-browser.mjs.
 	{
 		const { value, notices } = await phpJson(
 			server,
 			`
+				$admin_id = wp_insert_user([
+					'user_login' => 'cwicly_test_admin',
+					'user_pass' => 'test-password-1',
+					'role' => 'administrator',
+				]);
+				if (!is_wp_error($admin_id)) { wp_set_current_user($admin_id); }
 				do_action('admin_menu');
 				do_action('admin_print_scripts-toplevel_page_cwicly');
 				do_action('enqueue_block_editor_assets');

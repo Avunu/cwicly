@@ -1,0 +1,94 @@
+name: Release
+
+# Release Please maintains a release PR from Conventional Commits on main.
+# Merging that PR bumps composer.json + package.json + cwicly.php + CHANGELOG.md
+# and creates a *draft* GitHub Release (with auto-generated notes). The full check
+# suite then runs against that commit and, only if it passes, the plugin zip is
+# built with Nix, attached as the release asset and the release is published —
+# which is also when the tag gets created. Sites self-update from that asset via
+# plugin-update-checker (exactly one *.zip per release), and a draft is invisible
+# to it, so a release can never be seen before its zip exists.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Uses release-please-config.json + .release-please-manifest.json.
+
+  # The gate: check.yml already ran on the release PR, so this is normally a
+  # fast re-confirmation against the tagged commit.
+  checks:
+    needs: release
+    if: ${{ needs.release.outputs.release_created }}
+    uses: ./.github/workflows/check.yml
+
+  publish:
+    needs: [release, checks]
+    if: ${{ needs.release.outputs.release_created }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Cache Nix git fetches
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/nix/gitv3
+            ~/.cache/nix/fetcher-cache-v*.sqlite*
+          key: nix-fetchgit-${{ hashFiles('composer.lock', 'tests/tools/composer.lock') }}
+          restore-keys: nix-fetchgit-
+
+      - name: Build plugin zip
+        run: nix build .#zip -L
+
+      # gh resolves a draft by its tag name even though the tag does not exist yet.
+      - name: Attach zip and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag_name }}
+        run: |
+          gh release upload "$TAG" result/cwicly.zip --clobber
+          gh release edit "$TAG" --draft=false
+
+  # A failed suite or zip build leaves the release as a draft: harmless to
+  # installed sites, but nothing ships until someone acts. Make that loud
+  # rather than silent; re-running the workflow after a fix finishes the job.
+  notify-failure:
+    needs: [release, checks, publish]
+    if: ${{ always() && needs.release.outputs.release_created && (needs.checks.result == 'failure' || needs.publish.result == 'failure') }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release.outputs.tag_name }}
+        run: |
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Release $TAG is still a draft" \
+            --body "Release Please created \`$TAG\` as a draft, but the checks or the zip build failed, so no \`cwicly.zip\` was attached and the release was not published.
+
+          Installed sites do not see a draft, so nothing is broken — but the release will not ship until this is resolved.
+
+          Fix the failure, then re-run [this workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID) (re-running only the failed jobs is enough)."
