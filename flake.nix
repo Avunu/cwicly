@@ -124,26 +124,43 @@
         # c4's own fetch-deps.nix uses lib.importJSON the same way). Passed to
         # the build as a plain string so no .drv path needs realising first; the
         # build writes it to composer.lock and re-adds GD via injectGdPathRepo.
-        lockForC4Json =
+        #
+        # Two variants: `withDev` keeps packages-dev (the PHPStan stubs the
+        # checks need); the no-dev variant is what pluginPackage installs. A
+        # --no-dev install still *validates* the whole lock graph before
+        # pruning, so the full lock's szepeviktor -> phpstan/phpstan edge (a
+        # phar-only package absent from the c4 repo) breaks it; the no-dev
+        # variant drops packages-dev entirely and resolves cleanly.
+        mkLockForC4 =
+          withDev:
           let
             lock = builtins.fromJSON (builtins.readFile ./composer.lock);
             withoutGd = key: builtins.filter (p: p.name != gdPkgName) (lock.${key} or [ ]);
           in
           builtins.toJSON (lock // {
             packages = withoutGd "packages";
-            packages-dev = withoutGd "packages-dev";
+            packages-dev = if withDev then withoutGd "packages-dev" else [ ];
           });
+
+        lockForC4Json = mkLockForC4 true;
+        lockNoDevForC4Json = mkLockForC4 false;
 
         # c4 is fed the GD-free lock through its `src` argument: fetchComposerDeps
         # reads "${src}/composer.lock" with builtins.readFile. src must be a path,
-        # so this tiny runCommand directory is the only thing realised — and only
-        # when composerDeps is actually demanded by a build/check.
+        # so these tiny runCommand directories are the only things realised — and
+        # only when composerDeps is actually demanded by a build/check.
         lockForC4Dir = pkgs.runCommand "cwicly-composer-lock-for-c4-dir" { } ''
           mkdir "$out"
           printf '%s' ${lib.escapeShellArg lockForC4Json} > "$out/composer.lock"
         '';
 
+        lockNoDevForC4Dir = pkgs.runCommand "cwicly-composer-lock-nodev-for-c4-dir" { } ''
+          mkdir "$out"
+          printf '%s' ${lib.escapeShellArg lockNoDevForC4Json} > "$out/composer.lock"
+        '';
+
         composerDeps = pkgs.c4.fetchComposerDeps { src = lockForC4Dir; };
+        composerDepsNoDev = pkgs.c4.fetchComposerDeps { src = lockNoDevForC4Dir; };
 
         # The gutenberg-downgrade source tree, cleaned for copying into vendor/.
         # This is the flake input (a pinned git checkout), so Nix builds and CI
@@ -184,20 +201,22 @@
           '
         '';
 
-        # Before installing, start from the GD-free lock and re-add the GD entry
+        # Before installing, start from a GD-free lock and re-add the GD entry
         # with a path dist pointing at the store copy. Runs in patchPhase, so
         # the c4 hook's later `composer update --lock` sees the final package
         # set; it verifies only the root package's composer.json against the
         # lock's content-hash and rewrites package entries verbatim, so the
         # injected path dist survives untouched.
         #
-        # The dev-only szepeviktor/phpstan-wordpress package requires
-        # phpstan/phpstan, which is phar-only on Packagist and therefore absent
-        # from the c4 repo (and replaced by GD at runtime). Drop that one key
-        # from its lock entry: composer install honours the lock as-is, and the
-        # analysers that need phpstan get the nixpkgs binary instead.
-        injectGdPathRepo = ''
-          printf '%s' ${lib.escapeShellArg lockForC4Json} > composer.lock
+        # $lockJson is the GD-free lock for this derivation (full or no-dev).
+        # In the full variant, the dev-only szepeviktor/phpstan-wordpress
+        # package requires phpstan/phpstan, which is phar-only on Packagist and
+        # therefore absent from the c4 repo (and replaced by GD at runtime).
+        # Drop that one key from its lock entry: composer install honours the
+        # lock as-is, and the analysers that need phpstan get the nixpkgs
+        # binary instead.
+        injectGdPathRepo = lockJson: ''
+          printf '%s' ${lib.escapeShellArg lockJson} > composer.lock
           printf '%s' ${lib.escapeShellArg (builtins.toJSON gdEntry)} > gd-entry.json
           mkdir -p vendor-src/${gdPkgName}
           cp -r ${gdSource}/. vendor-src/${gdPkgName}/
@@ -258,8 +277,11 @@
             pname
             version
             src
-            composerDeps
             ;
+
+          # The runtime-only dependency set: a --no-dev install still validates
+          # the whole lock graph, so it gets the dev-free lock (see mkLockForC4).
+          composerDeps = composerDepsNoDev;
 
           nativeBuildInputs = [
             php
@@ -270,7 +292,7 @@
           patchPhase = ''
             runHook prePatch
             ${stripGdRepo}
-            ${injectGdPathRepo}
+            ${injectGdPathRepo lockNoDevForC4Json}
             runHook postPatch
           '';
 
@@ -338,7 +360,7 @@
           patchPhase = ''
             runHook prePatch
             ${stripGdRepo}
-            ${injectGdPathRepo}
+            ${injectGdPathRepo lockForC4Json}
             runHook postPatch
           '';
 
