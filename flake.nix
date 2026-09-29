@@ -188,15 +188,23 @@
             ]);
         };
 
-        # The root composer.json's ../gutenberg-downgrade path repository is
-        # dropped for the sandbox: the sibling checkout does not exist there, and
-        # the c4 hook's `composer update --lock` validates every declared
-        # repository. Stripping happens in patchPhase — strictly before the hook
-        # runs in configurePhase.
-        stripGdRepo = ''
+        # The root composer.json declares ../gutenberg-downgrade as a path
+        # repository, but the sibling checkout does not exist in the sandbox.
+        # Deleting the key would change composer.json's content-hash and force a
+        # full re-resolution (which cannot find GD anywhere). Instead REPOINT it
+        # at the store copy staged by injectGdPathRepo: the repository stays
+        # declared, resolves against a real directory containing GD's
+        # composer.json, and `composer update --lock` only refreshes the hash
+        # without touching the package graph.
+        repointGdRepo = ''
           php -r '
             $json = json_decode(file_get_contents("composer.json"), true, 512, JSON_THROW_ON_ERROR);
-            unset($json["repositories"]);
+            foreach ($json["repositories"] as &$repo) {
+              if (($repo["type"] ?? "") === "path" && ($repo["url"] ?? "") === "../gutenberg-downgrade") {
+                $repo["url"] = getcwd() . "/vendor-src/${gdPkgName}";
+              }
+            }
+            unset($repo);
             file_put_contents("composer.json", json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
           '
         '';
@@ -291,8 +299,8 @@
 
           patchPhase = ''
             runHook prePatch
-            ${stripGdRepo}
             ${injectGdPathRepo lockNoDevForC4Json}
+            ${repointGdRepo}
             runHook postPatch
           '';
 
@@ -355,12 +363,13 @@
             pkgs.c4.composerSetupHook
           ];
 
-          # See pluginPackage: repos stripped and lock finalised in patchPhase,
-          # the c4 hook then configures them in configurePhase.
+          # See pluginPackage: the GD store copy is staged and the lock
+          # finalised, then the path repository is repointed at it — all in
+          # patchPhase, before the c4 hook configures repos in configurePhase.
           patchPhase = ''
             runHook prePatch
-            ${stripGdRepo}
             ${injectGdPathRepo lockForC4Json}
+            ${repointGdRepo}
             runHook postPatch
           '';
 
