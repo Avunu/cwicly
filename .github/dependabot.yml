@@ -5,8 +5,8 @@ version: 2
 # actually cutting a release. Dep bumps use the `chore` type so they never force a release
 # on their own — they ride along with the next real release.
 #
-# avunu/gutenberg-downgrade is a path repository (../gutenberg-downgrade) and is not a
-# dependency Dependabot can resolve; it updates by bumping the flake input instead.
+# avunu/gutenberg-downgrade comes from its public GitHub vcs repository (see composer.json),
+# so the composer entry below bumps it to new release tags like any Packagist package.
 updates:
   - package-ecosystem: github-actions
     directory: /

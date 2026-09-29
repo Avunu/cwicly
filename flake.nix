@@ -5,9 +5,6 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     composition-c4.url = "github:fossar/composition-c4";
-    # The fork bundles gutenberg-downgrade as a composer path dependency; the
-    # flake pins the same repo so Nix builds stay pure and CI can fetch it.
-    gutenberg-downgrade.url = "github:Avunu/gutenberg-downgrade";
     git-hooks = {
       url = "github:cachix/git-hooks.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -21,7 +18,6 @@
       flake-utils,
       composition-c4,
       git-hooks,
-      gutenberg-downgrade,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -95,156 +91,32 @@
         # c4.fetchComposerDeps reads composer.lock per-package — no hash.     #
         # It fetches packages-dev too (the PHPStan WordPress stubs), which the #
         # checks rely on; `composer install --no-dev` keeps them out of the    #
-        # zip. avunu/gutenberg-downgrade is a path repository with no git      #
-        # source, so it is filtered out of the lock handed to c4 and injected  #
-        # as a path dist at build time instead (see injectGdPathRepo).         #
+        # zip. avunu/gutenberg-downgrade comes from its GitHub vcs repository  #
+        # and is git-fetched from its lock `source` like everything else.      #
         # phpstan/phpdoc-parser is pinned in tests/tools/composer.json: c4     #
         # can only git-fetch packages that appear in some lock, and the phar-  #
         # only phpstan/phpstan itself comes from nixpkgs.                      #
         # ------------------------------------------------------------------ #
-        gdPkgName = "avunu/gutenberg-downgrade";
+        composerDeps = pkgs.c4.fetchComposerDeps { lockFile = ./composer.lock; };
 
-        # The GD entry exactly as committed: version + autoload metadata, minus
-        # its path dist/source (which have no place in the store-built tree).
-        gdEntry =
-          let
-            lock = builtins.fromJSON (builtins.readFile ./composer.lock);
-            hit = lib.findFirst (p: p.name == gdPkgName) null lock.packages;
-          in
-          if hit == null then
-            throw "composer.lock has no ${gdPkgName} entry"
-          else
-            builtins.removeAttrs hit [
-              "source"
-              "dist"
-            ];
-
-        # The lock with the GD entry removed, computed at evaluation time (pure:
-        # c4's own fetch-deps.nix uses lib.importJSON the same way). Passed to
-        # the build as a plain string so no .drv path needs realising first; the
-        # build writes it to composer.lock and re-adds GD via injectGdPathRepo.
-        #
-        # Two variants: `withDev` keeps packages-dev (the PHPStan stubs the
-        # checks need); the no-dev variant is what pluginPackage installs. A
-        # --no-dev install still *validates* the whole lock graph before
-        # pruning, so the full lock's szepeviktor -> phpstan/phpstan edge (a
-        # phar-only package absent from the c4 repo) breaks it; the no-dev
-        # variant drops packages-dev entirely and resolves cleanly.
-        mkLockForC4 =
-          withDev:
-          let
-            lock = builtins.fromJSON (builtins.readFile ./composer.lock);
-            withoutGd = key: builtins.filter (p: p.name != gdPkgName) (lock.${key} or [ ]);
-          in
-          builtins.toJSON (
-            lock
-            // {
-              packages = withoutGd "packages";
-              packages-dev = if withDev then withoutGd "packages-dev" else [ ];
-            }
-          );
-
-        lockForC4Json = mkLockForC4 true;
-        lockNoDevForC4Json = mkLockForC4 false;
-
-        # c4 is fed the GD-free lock through its `src` argument: fetchComposerDeps
-        # reads "${src}/composer.lock" with builtins.readFile. src must be a path,
-        # so these tiny runCommand directories are the only things realised — and
-        # only when composerDeps is actually demanded by a build/check.
-        lockForC4Dir = pkgs.runCommand "cwicly-composer-lock-for-c4-dir" { } ''
-          mkdir "$out"
-          printf '%s' ${lib.escapeShellArg lockForC4Json} > "$out/composer.lock"
-        '';
-
-        lockNoDevForC4Dir = pkgs.runCommand "cwicly-composer-lock-nodev-for-c4-dir" { } ''
-          mkdir "$out"
-          printf '%s' ${lib.escapeShellArg lockNoDevForC4Json} > "$out/composer.lock"
-        '';
-
-        composerDeps = pkgs.c4.fetchComposerDeps { src = lockForC4Dir; };
-        composerDepsNoDev = pkgs.c4.fetchComposerDeps { src = lockNoDevForC4Dir; };
-
-        # The gutenberg-downgrade source tree, cleaned for copying into vendor/.
-        # This is the flake input (a pinned git checkout), so Nix builds and CI
-        # are pure. The composer path repository in composer.json points at the
-        # sibling checkout for local development; the lock records it as a path
-        # install, which injectGdPathRepo rewrites to this store copy at build
-        # time.
-        gdSource = builtins.path {
-          name = "gutenberg-downgrade-src";
-          path = gutenberg-downgrade;
-          filter =
-            path: _type:
-            let
-              base = baseNameOf (toString path);
-            in
-            !(lib.elem base [
-              ".git"
-              ".direnv"
-              ".envrc"
-              "node_modules"
-              "vendor"
-              "result"
-              "debug"
-              ".phpunit.cache"
-            ]);
-        };
-
-        # The root composer.json declares ../gutenberg-downgrade as a path
-        # repository, but the sibling checkout does not exist in the sandbox.
-        # Deleting the key would change composer.json's content-hash and force a
-        # full re-resolution (which cannot find GD anywhere). Instead REPOINT it
-        # at the store copy staged by injectGdPathRepo: the repository stays
-        # declared, resolves against a real directory containing GD's
-        # composer.json, and `composer update --lock` only refreshes the hash
-        # without touching the package graph.
-        repointGdRepo = ''
+        # composer.json declares the gutenberg-downgrade GitHub repository as a
+        # vcs repository. The c4 hook's `composer update --lock` would try to
+        # scan it, and the sandbox has no network; the package is already in
+        # the c4 repository, so drop the entry before the hook runs in
+        # configurePhase. `update --lock` refreshes the content-hash, exactly
+        # as it does for c4's own repository changes.
+        dropVcsRepos = ''
           php -r '
             $json = json_decode(file_get_contents("composer.json"), true, 512, JSON_THROW_ON_ERROR);
-            foreach ($json["repositories"] as &$repo) {
-              if (($repo["type"] ?? "") === "path" && ($repo["url"] ?? "") === "../gutenberg-downgrade") {
-                $repo["url"] = getcwd() . "/vendor-src/${gdPkgName}";
-              }
+            $json["repositories"] = array_values(array_filter(
+              $json["repositories"] ?? [],
+              fn ($repo) => ($repo["type"] ?? "") !== "vcs"
+            ));
+            if ($json["repositories"] === []) {
+              unset($json["repositories"]);
             }
-            unset($repo);
             file_put_contents("composer.json", json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
           '
-        '';
-
-        # Before installing, start from a GD-free lock and re-add the GD entry
-        # with a path dist pointing at the store copy. Runs in patchPhase, so
-        # the c4 hook's later `composer update --lock` sees the final package
-        # set; it verifies only the root package's composer.json against the
-        # lock's content-hash and rewrites package entries verbatim, so the
-        # injected path dist survives untouched.
-        #
-        # $lockJson is the GD-free lock for this derivation (full or no-dev).
-        # In the full variant, the dev-only szepeviktor/phpstan-wordpress
-        # package requires phpstan/phpstan, which is phar-only on Packagist and
-        # therefore absent from the c4 repo (and replaced by GD at runtime).
-        # Drop that one key from its lock entry: composer install honours the
-        # lock as-is, and the analysers that need phpstan get the nixpkgs
-        # binary instead.
-        injectGdPathRepo = lockJson: ''
-          printf '%s' ${lib.escapeShellArg lockJson} > composer.lock
-          printf '%s' ${lib.escapeShellArg (builtins.toJSON gdEntry)} > gd-entry.json
-          mkdir -p vendor-src/${gdPkgName}
-          cp -r ${gdSource}/. vendor-src/${gdPkgName}/
-          chmod -R u+w vendor-src
-          php -r '
-            $lock = json_decode(file_get_contents("composer.lock"), true, 512, JSON_THROW_ON_ERROR);
-            foreach ($lock["packages-dev"] as &$pkg) {
-              if ($pkg["name"] === "szepeviktor/phpstan-wordpress") {
-                unset($pkg["require"]["phpstan/phpstan"]);
-              }
-            }
-            unset($pkg);
-            $entry = json_decode(file_get_contents("gd-entry.json"), true, 512, JSON_THROW_ON_ERROR);
-            $entry["dist"] = ["type" => "path", "url" => getcwd() . "/vendor-src/${gdPkgName}", "reference" => null];
-            $lock["packages"][] = $entry;
-            file_put_contents("composer.lock", json_encode($lock, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-          '
-          rm -f gd-entry.json
         '';
 
         # The test runners (PHPUnit, Brain Monkey) live in their own Composer
@@ -289,9 +161,7 @@
             src
             ;
 
-          # The runtime-only dependency set: a --no-dev install still validates
-          # the whole lock graph, so it gets the dev-free lock (see mkLockForC4).
-          composerDeps = composerDepsNoDev;
+          inherit composerDeps;
 
           nativeBuildInputs = [
             php
@@ -301,8 +171,7 @@
 
           patchPhase = ''
             runHook prePatch
-            ${injectGdPathRepo lockNoDevForC4Json}
-            ${repointGdRepo}
+            ${dropVcsRepos}
             runHook postPatch
           '';
 
@@ -323,7 +192,6 @@
             # Nix store; the distributable plugin must contain real, self-contained files.
             cp -rL assets build core vendor "$pluginDir/"
             chmod -R u+w "$pluginDir"
-            # The path-repo copy is a plain directory, not a store symlink — fine.
             test -f "$pluginDir/vendor/avunu/gutenberg-downgrade/gutenberg-downgrade.php" \
               || { echo "gutenberg-downgrade missing from vendor/" >&2; exit 1; }
 
@@ -365,13 +233,11 @@
             pkgs.c4.composerSetupHook
           ];
 
-          # See pluginPackage: the GD store copy is staged and the lock
-          # finalised, then the path repository is repointed at it — all in
-          # patchPhase, before the c4 hook configures repos in configurePhase.
+          # See pluginPackage: the vcs repository goes before the c4 hook
+          # configures repos in configurePhase.
           patchPhase = ''
             runHook prePatch
-            ${injectGdPathRepo lockForC4Json}
-            ${repointGdRepo}
+            ${dropVcsRepos}
             runHook postPatch
           '';
 
@@ -385,8 +251,6 @@
             runHook preInstall
             mkdir -p "$out"
             cp -rL vendor "$out/"
-            # The GD path copy is not a store symlink; keep it real and deref'd.
-            chmod -R u+w "$out/vendor/${gdPkgName}" 2>/dev/null || true
             runHook postInstall
           '';
         };
