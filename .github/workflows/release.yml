@@ -4,10 +4,18 @@ name: Release
 # Merging that PR bumps composer.json + package.json + cwicly.php + CHANGELOG.md
 # and creates a *draft* GitHub Release (with auto-generated notes). The full check
 # suite then runs against that commit and, only if it passes, the plugin zip is
-# built with Nix, attached as the release asset and the release is published —
-# which is also when the tag gets created. Sites self-update from that asset via
-# plugin-update-checker (exactly one *.zip per release), and a draft is invisible
-# to it, so a release can never be seen before its zip exists.
+# built with Nix, attached as the release asset and the release is published.
+# Sites self-update from that asset via plugin-update-checker (exactly one *.zip
+# per release), and a draft is invisible to it, so a release can never be seen
+# before its zip exists.
+#
+# The tag is created up front (force-tag-creation in release-please-config.json),
+# NOT at publish time. GitHub only creates a draft's tag when it is published, and
+# release-please ignores releases that have no tag. Without the up-front tag, the
+# release-please run that fires right after a release merge cannot see the
+# release it just made, so it opens the next release PR with the entire history
+# in its changelog; the same happens permanently for any draft that is never
+# published. Do not remove force-tag-creation while "draft" is true.
 on:
   push:
     branches:
@@ -61,7 +69,7 @@ jobs:
       - name: Build plugin zip
         run: nix build .#zip -L
 
-      # gh resolves a draft by its tag name even though the tag does not exist yet.
+      # gh resolves the draft by its tag name; the tag already exists (see top).
       - name: Attach zip and publish the release
         env:
           GH_TOKEN: ${{ github.token }}
