@@ -4,7 +4,7 @@
  * Plugin URI:        https://cwicly.com/
  * Description:       Take Gutenberg by WordPress to the next level. Design & create professional responsive websites in minutes.
  * x-release-please-start-version
- * Version:           1.5.0
+ * Version:           1.6.0
  * x-release-please-end
  * Author:            Cwicly
  * Author URI:        https://cwicly.com/
@@ -44,7 +44,7 @@ $cwiclyUpdateChecker->getVcsApi()->enableReleaseAssets( '/\.zip$/i' );
 
 // Define Version.
 // x-release-please-start-version
-define( 'CWICLY_VERSION', '1.5.0' );
+define( 'CWICLY_VERSION', '1.6.0' );
 // x-release-please-end
 
 // Define WordPress.
